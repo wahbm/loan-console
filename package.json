@@ -14,7 +14,7 @@
     "build:server": "npm run build:packages && npm run build --workspace @loan-console/api",
     "dev": "npm run build:packages && concurrently -k \"npm run dev --workspace @loan-console/api\" \"npm run dev --workspace @loan-console/web\"",
     "build": "npm run build:packages && npm run build --workspace @loan-console/api && npm run build --workspace @loan-console/web",
-    "test": "vitest run",
+    "test": "npm run build:packages && vitest run",
     "test:watch": "vitest",
     "typecheck": "npm run build:packages && npm run typecheck --workspace @loan-console/api && npm run typecheck --workspace @loan-console/web",
     "db:generate": "npm run build:packages && drizzle-kit generate",
