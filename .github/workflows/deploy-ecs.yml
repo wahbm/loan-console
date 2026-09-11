@@ -90,7 +90,25 @@ jobs:
           ln -s "releases/\$release_id" "${DEPLOY_PATH}/current.next"
           mv -Tf "${DEPLOY_PATH}/current.next" "\$current_link"
 
-          if ! sudo systemctl start loan-console-migrate || ! sudo systemctl restart loan-console || ! curl --fail --silent --show-error http://127.0.0.1:3200/api/health; then
+          if ! sudo systemctl start loan-console-migrate || ! sudo systemctl restart loan-console; then
+            sudo journalctl --no-pager -u loan-console -n 80 >&2 || true
+            if [ -n "\$previous_target" ]; then
+              ln -s "\$previous_target" "${DEPLOY_PATH}/current.rollback"
+              mv -Tf "${DEPLOY_PATH}/current.rollback" "\$current_link"
+              sudo systemctl restart loan-console
+            fi
+            exit 1
+          fi
+
+          healthy=0
+          for attempt in \$(seq 1 30); do
+            if curl --fail --silent --show-error http://127.0.0.1:3200/api/health; then
+              healthy=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "\$healthy" -ne 1 ]; then
             sudo journalctl --no-pager -u loan-console -n 80 >&2 || true
             if [ -n "\$previous_target" ]; then
               ln -s "\$previous_target" "${DEPLOY_PATH}/current.rollback"
