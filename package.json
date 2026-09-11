@@ -1,0 +1,33 @@
+{
+  "name": "loan-console",
+  "private": true,
+  "version": "1.0.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build:packages": "npm run build --workspace @loan-console/calculation && npm run build --workspace @loan-console/shared && npm run build --workspace @loan-console/validation",
+    "build:server": "npm run build:packages && npm run build --workspace @loan-console/api",
+    "dev": "npm run build:packages && concurrently -k \"npm run dev --workspace @loan-console/api\" \"npm run dev --workspace @loan-console/web\"",
+    "build": "npm run build:packages && npm run build --workspace @loan-console/api && npm run build --workspace @loan-console/web",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "npm run build:packages && npm run typecheck --workspace @loan-console/api && npm run typecheck --workspace @loan-console/web",
+    "db:generate": "npm run build:packages && drizzle-kit generate",
+    "db:migrate": "npm run build:server && node apps/api/dist/cli/migrate.js",
+    "admin:create": "npm run build:server && node apps/api/dist/cli/admin.js create",
+    "admin:reset-password": "npm run build:server && node apps/api/dist/cli/admin.js reset-password"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.10",
+    "concurrently": "^9.1.0",
+    "drizzle-kit": "^0.31.10",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

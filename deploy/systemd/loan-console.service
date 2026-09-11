@@ -1,0 +1,23 @@
+[Unit]
+Description=Loan Console API
+After=network.target mariadb.service
+
+[Service]
+Type=simple
+User=loan-console
+Group=loan-console
+WorkingDirectory=/srv/loan-console/current
+EnvironmentFile=/etc/loan-console/loan-console.env
+ExecStart=/usr/bin/node /srv/loan-console/current/apps/api/dist/server.js
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/loan-console/persistent
+MemoryMax=384M
+LimitNOFILE=4096
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,112 @@
+name: deploy-ecs
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: loan-console-production
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+        env:
+          VITE_BASE_PATH: /loan-console/
+
+  deploy:
+    needs: verify
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+        env:
+          VITE_BASE_PATH: /loan-console/
+      - name: Package release
+        run: |
+          set -euo pipefail
+          mkdir -p release/apps/api release/apps/web
+          cp -R apps/api/dist release/apps/api/
+          cp -R apps/api/package.json release/apps/api/
+          cp -R apps/web/dist release/apps/web/
+          cp package.json package-lock.json release/
+          cp -R packages release/packages
+          cp -R drizzle release/drizzle
+          tar -czf loan-console-${GITHUB_SHA}.tgz -C release .
+      - name: Upload and atomically switch release
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ vars.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+          DEPLOY_KNOWN_HOSTS: ${{ vars.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          install -m 600 /dev/null "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
+          install -m 600 /dev/null known_hosts
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > known_hosts
+          export SSH_OPTS="-i $HOME/.ssh/id_ed25519 -p ${DEPLOY_PORT} -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$PWD/known_hosts"
+          export RSYNC_RSH="ssh $SSH_OPTS"
+          ssh $SSH_OPTS "$DEPLOY_USER@$DEPLOY_HOST" "set -euo pipefail; mkdir -p '$DEPLOY_PATH/releases' '$DEPLOY_PATH/persistent'"
+          rsync -az --chmod=F644,D755 -e "$RSYNC_RSH" loan-console-${GITHUB_SHA}.tgz "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/releases/"
+          ssh $SSH_OPTS "$DEPLOY_USER@$DEPLOY_HOST" 'bash -s' <<EOF
+          set -euo pipefail
+          release_id="${GITHUB_SHA}"
+          release_root="${DEPLOY_PATH}/releases"
+          release_dir="\$release_root/\$release_id"
+          current_link="${DEPLOY_PATH}/current"
+          previous_target=""
+
+          if [ -L "\$current_link" ]; then
+            previous_target="\$(readlink "\$current_link")"
+          fi
+
+          mkdir -p "\$release_dir"
+          tar -xzf "\$release_root/loan-console-${GITHUB_SHA}.tgz" -C "\$release_dir"
+          cd "\$release_dir"
+          npm ci --omit=dev
+
+          ln -s "releases/\$release_id" "${DEPLOY_PATH}/current.next"
+          mv -Tf "${DEPLOY_PATH}/current.next" "\$current_link"
+
+          if ! sudo systemctl start loan-console-migrate || ! sudo systemctl restart loan-console || ! curl --fail --silent --show-error http://127.0.0.1:3200/api/health; then
+            sudo journalctl --no-pager -u loan-console -n 80 >&2 || true
+            if [ -n "\$previous_target" ]; then
+              ln -s "\$previous_target" "${DEPLOY_PATH}/current.rollback"
+              mv -Tf "${DEPLOY_PATH}/current.rollback" "\$current_link"
+              sudo systemctl restart loan-console
+            fi
+            exit 1
+          fi
+
+          rm -f "\$release_root/loan-console-${GITHUB_SHA}.tgz"
+          if [ -n "\$previous_target" ]; then
+            previous_id="\$(basename "\$previous_target")"
+            for candidate in "\$release_root"/*; do
+              if [ -d "\$candidate" ] && [ "\$(basename "\$candidate")" != "\$release_id" ] && [ "\$(basename "\$candidate")" != "\$previous_id" ]; then
+                rm -rf -- "\$candidate"
+              fi
+            done
+          fi
+          EOF
