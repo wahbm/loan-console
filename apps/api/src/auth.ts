@@ -11,8 +11,12 @@ function hashToken(token: string, secret: string): string {
   return createHmac("sha256", secret).update(token).digest("hex");
 }
 
-function isoAfterSeconds(seconds: number): string {
-  return new Date(Date.now() + seconds * 1000).toISOString();
+export function sqlTimestamp(date: Date): string {
+  return date.toISOString().slice(0, 19).replace("T", " ");
+}
+
+function sqlAfterSeconds(seconds: number): string {
+  return sqlTimestamp(new Date(Date.now() + seconds * 1000));
 }
 
 function parseTime(value: string): number {
@@ -38,12 +42,12 @@ export class AuthService {
     const user = await this.repository.findUserByUsername(username);
     if (!user || !(await verifyPassword(user.passwordHash, password))) throw new Error("INVALID_CREDENTIALS");
     const rawToken = randomBytes(32).toString("base64url");
-    const now = new Date().toISOString();
+    const now = sqlTimestamp(new Date());
     await this.repository.createSession({
       id: randomUUID(),
       userId: user.id,
       sessionTokenHash: hashToken(rawToken, this.config.sessionSecret),
-      expiresAt: isoAfterSeconds(this.config.sessionMaxTtlSeconds),
+      expiresAt: sqlAfterSeconds(this.config.sessionMaxTtlSeconds),
       lastSeenAt: now
     });
     reply.setCookie(SESSION_COOKIE, rawToken, {
@@ -80,8 +84,8 @@ export class AuthService {
     }
     const user = await this.repository.findUserById(session.userId);
     if (!user) return null;
-    const nextExpiry = new Date(Math.min(absoluteExpiry, now + this.config.sessionIdleTtlSeconds * 1000)).toISOString();
-    await this.repository.touchSession(session.id, new Date(now).toISOString(), nextExpiry);
+    const nextExpiry = sqlTimestamp(new Date(Math.min(absoluteExpiry, now + this.config.sessionIdleTtlSeconds * 1000)));
+    await this.repository.touchSession(session.id, sqlTimestamp(new Date(now)), nextExpiry);
     return { id: user.id, username: user.username };
   }
 }
