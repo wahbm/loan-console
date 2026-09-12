@@ -20,7 +20,10 @@ export type PrepaymentStrategy = "reduce_term" | "reduce_payment";
 
 export type PrepaymentAllocation = {
   componentId: string;
+  /** Principal reduction only. */
   amount: string;
+  /** Bank-settled accrued interest paid with the prepayment; it does not reduce principal. */
+  interestAmount?: string;
 };
 
 export type PrepaymentEvent = {
@@ -70,6 +73,9 @@ export type PrepaymentComparison = {
   before: LoanSchedule;
   after: LoanSchedule;
   savedInterest: string;
+  totalInterestSaved: string;
+  prepaymentInterest: string;
+  netSavedInterest: string;
   savedPeriods: number;
   firstPaymentReduction: string;
   prepaymentDate: string;

@@ -1,0 +1,1 @@
+ALTER TABLE `prepayment_allocations` ADD `interest_amount` decimal(18,2) DEFAULT '0.00' NOT NULL;

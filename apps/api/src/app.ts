@@ -23,7 +23,7 @@ import type { AppConfig } from "./config.js";
 import { AuthService } from "./auth.js";
 import type { Repository, SavedScenario } from "./repositories/types.js";
 
-const CALCULATION_VERSION = "1";
+const CALCULATION_VERSION = "1.1";
 
 function addMoney(left: string, right: string): string {
   return new Decimal(left).plus(right).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toFixed(2);

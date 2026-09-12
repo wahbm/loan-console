@@ -176,7 +176,7 @@ export class SqlRepository implements Repository {
         calculationVersion: scenario.calculationVersion,
         createdAt: scenario.createdAt
       });
-      await transaction.insert(prepaymentAllocations).values(scenario.inputSnapshotJson.components.map((allocation) => ({ id: randomUUID(), scenarioId: scenario.id, componentId: allocation.componentId, amount: allocation.amount })));
+      await transaction.insert(prepaymentAllocations).values(scenario.inputSnapshotJson.components.map((allocation) => ({ id: randomUUID(), scenarioId: scenario.id, componentId: allocation.componentId, amount: allocation.amount, interestAmount: allocation.interestAmount ?? "0.00" })));
     });
     return scenario;
   }
@@ -217,7 +217,7 @@ export class SqlRepository implements Repository {
   async exportBackup(): Promise<BackupData> {
     const cases = await this.listLoanCases();
     const scenarios = (await Promise.all(cases.map((loan) => this.listScenarios(loan.id)))).flat();
-    const allocations = scenarios.flatMap((scenario) => scenario.inputSnapshotJson.components.map((item) => ({ id: randomUUID(), scenarioId: scenario.id, componentId: item.componentId, amount: item.amount })));
+    const allocations = scenarios.flatMap((scenario) => scenario.inputSnapshotJson.components.map((item) => ({ id: randomUUID(), scenarioId: scenario.id, componentId: item.componentId, amount: item.amount, interestAmount: item.interestAmount ?? "0.00" })));
     return {
       loanCases: cases,
       loanComponents: cases.flatMap((loan) => loan.components),
@@ -243,7 +243,7 @@ export class SqlRepository implements Repository {
       }
       for (const scenario of data.prepaymentScenarios) {
         await transaction.insert(prepaymentScenarios).values({ id: scenario.id, loanCaseId: scenario.loanCaseId, prepaymentDate: scenario.prepaymentDate, strategy: scenario.strategy, inputSnapshotJson: scenario.inputSnapshotJson, resultSnapshotJson: scenario.resultSnapshotJson, calculationVersion: scenario.calculationVersion, createdAt: scenario.createdAt });
-        await transaction.insert(prepaymentAllocations).values(scenario.inputSnapshotJson.components.map((allocation) => ({ id: randomUUID(), scenarioId: scenario.id, componentId: allocation.componentId, amount: allocation.amount })));
+        await transaction.insert(prepaymentAllocations).values(scenario.inputSnapshotJson.components.map((allocation) => ({ id: randomUUID(), scenarioId: scenario.id, componentId: allocation.componentId, amount: allocation.amount, interestAmount: allocation.interestAmount ?? "0.00" })));
       }
     });
   }

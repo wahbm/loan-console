@@ -17,6 +17,16 @@ const equalPaymentComponent: ComponentInput = {
   ratePeriods: [{ effectiveDate: "2026-01-01", annualRate: "0.03600000" }]
 };
 
+const commercialMortgageComponent: ComponentInput = {
+  id: "commercial-mortgage",
+  principal: "2950000.00",
+  disbursementDate: "2025-05-26",
+  firstPaymentDate: "2025-06-20",
+  termMonths: 360,
+  repaymentMethod: "equal_payment",
+  ratePeriods: [{ effectiveDate: "2025-05-26", annualRate: "0.03050000" }]
+};
+
 describe("date anchors", () => {
   it("keeps month-end anchors", () => {
     expect(addMonthsFromAnchor("2026-01-31", 1)).toBe("2026-02-28");
@@ -86,6 +96,51 @@ describe("loan schedule engine", () => {
     expect(Number(comparison.after.metrics.remainingInterest)).toBeLessThan(Number(comparison.before.metrics.remainingInterest));
     expect(Number(comparison.savedInterest)).toBeGreaterThan(0);
     expect(comparison.before.components[0]?.rows).not.toEqual(comparison.after.components[0]?.rows);
+  });
+
+  it("keeps the original equal-payment amount when reducing the term", () => {
+    const comparison = comparePrepayment([commercialMortgageComponent], "2026-09-12", {
+      date: "2025-12-26",
+      strategy: "reduce_term",
+      allocations: [{ componentId: commercialMortgageComponent.id, amount: "500000.00" }]
+    });
+    const afterRows = comparison.after.components[0]?.rows ?? [];
+    const regeneratedRows = afterRows.filter((row) => row.paymentDate >= "2026-02-20");
+
+    expect(comparison.before.metrics.nextPayment).toBe("12517.01");
+    expect(comparison.after.metrics.nextPayment).toBe("12517.01");
+    expect(regeneratedRows.length).toBeGreaterThan(1);
+    expect(regeneratedRows.slice(0, -1).every((row) => row.payment === "12517.01")).toBe(true);
+    expect(afterRows.at(-1)?.endingPrincipal).toBe("0.00");
+  });
+
+  it("treats a reduce-payment allocation as principal only", () => {
+    const comparison = comparePrepayment([commercialMortgageComponent], "2026-09-12", {
+      date: "2025-12-26",
+      strategy: "reduce_payment",
+      allocations: [{ componentId: commercialMortgageComponent.id, amount: "500000.00" }]
+    });
+
+    expect(comparison.after.metrics.nextPayment).toBe("10365.94");
+  });
+
+  it("records extra prepayment interest without changing the principal schedule", () => {
+    const withoutInterest = comparePrepayment([commercialMortgageComponent], "2026-09-12", {
+      date: "2025-12-26",
+      strategy: "reduce_payment",
+      allocations: [{ componentId: commercialMortgageComponent.id, amount: "500000.00" }]
+    });
+    const withInterest = comparePrepayment([commercialMortgageComponent], "2026-09-12", {
+      date: "2025-12-26",
+      strategy: "reduce_payment",
+      allocations: [{ componentId: commercialMortgageComponent.id, amount: "500000.00", interestAmount: "1480.94" }]
+    });
+
+    expect(withInterest.after).toEqual(withoutInterest.after);
+    expect(withInterest.prepaymentInterest).toBe("1480.94");
+    expect(Number(withInterest.netSavedInterest)).toBeCloseTo(
+      Number(withInterest.totalInterestSaved) - 1480.94
+    );
   });
 
   it("aggregates mixed components", () => {

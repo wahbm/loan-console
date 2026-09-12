@@ -73,7 +73,8 @@ export const prepaymentAllocations = mysqlTable("prepayment_allocations", {
   id: varchar("id", { length: 36 }).primaryKey(),
   scenarioId: varchar("scenario_id", { length: 36 }).notNull(),
   componentId: varchar("component_id", { length: 36 }).notNull(),
-  amount: decimal("amount", { precision: 18, scale: 2 }).notNull()
+  amount: decimal("amount", { precision: 18, scale: 2 }).notNull(),
+  interestAmount: decimal("interest_amount", { precision: 18, scale: 2 }).notNull().default("0.00")
 }, (table) => ({ allocationUnique: uniqueIndex("prepayment_allocation_unique").on(table.scenarioId, table.componentId) }));
 
 export const userRelations = relations(users, ({ many }) => ({ sessions: many(authSessions) }));

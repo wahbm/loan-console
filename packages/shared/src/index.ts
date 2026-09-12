@@ -53,7 +53,7 @@ export type LoanCaseInput = {
 export type PrepaymentInput = {
   date: string;
   strategy: PrepaymentStrategy;
-  components: Array<{ componentId: string; amount: string }>;
+  components: Array<{ componentId: string; amount: string; interestAmount?: string }>;
 };
 
 export type ScheduleResponse = {

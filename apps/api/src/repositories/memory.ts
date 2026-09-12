@@ -210,7 +210,7 @@ export class MemoryRepository implements Repository {
     const scenario = { ...input, createdAt: input.createdAt ?? nowIso() };
     this.state.scenarios = [...this.state.scenarios, scenario];
     for (const allocation of input.inputSnapshotJson.components) {
-      this.state.allocations.push({ id: randomUUID(), scenarioId: scenario.id, componentId: allocation.componentId, amount: allocation.amount });
+      this.state.allocations.push({ id: randomUUID(), scenarioId: scenario.id, componentId: allocation.componentId, amount: allocation.amount, interestAmount: allocation.interestAmount ?? "0.00" });
     }
     await this.persist();
     return structuredClone(scenario);

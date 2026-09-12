@@ -43,6 +43,17 @@ At each boundary:
 
 Each component receives its own allocation. The first payment boundary on or after the input date is selected. That boundary's regular installment is calculated first; the allocation is then deducted from the post-installment balance and the next segment is regenerated.
 
+An allocation is the principal-reduction amount only. Any bank-collected accrued interest between the last scheduled payment and the prepayment date is outside the V1 monthly model and must not be added to the allocation. It may be supplied separately as `interestAmount`; this amount is recorded as an additional prepayment cost, does not reduce principal, and does not create a monthly schedule row.
+
+The comparison returns both the planned interest reduction and the net lifetime interest reduction:
+
+```text
+totalInterestSaved = before.totalInterest - after.totalInterest
+netSavedInterest = totalInterestSaved - sum(prepayment interestAmount)
+```
+
+`interestAmount` is an explicitly supplied settlement value. V1 does not infer it from dates or rates and therefore cannot guarantee a bank-level daily-interest result without the bank's actual settlement rules or statement amount.
+
 - `reduce_term`: equal payment keeps the current segment's scheduled payment; equal principal keeps the segment's fixed principal amount. Future rate boundaries can still change the payment.
 - `reduce_payment`: remaining periods are kept; equal payment recalculates payment and equal principal recalculates fixed principal.
 

@@ -168,9 +168,12 @@ function addPrepaymentToRows(
   asOf: string
 ): ScheduleRow[] {
   const allocation = event.allocations.find((item) => item.componentId === component.id);
-  if (!allocation || money(allocation.amount).eq(0)) return baseRows;
+  if (!allocation) return baseRows;
   const amount = money(allocation.amount);
+  const interestAmount = money(allocation.interestAmount ?? "0");
   if (amount.isNegative()) throw new Error("prepayment amount cannot be negative");
+  if (interestAmount.isNegative()) throw new Error("prepayment interest amount cannot be negative");
+  if (amount.eq(0)) return baseRows;
   const boundaryIndex = baseRows.findIndex((row) => row.paymentDate >= event.date);
   if (boundaryIndex < 0) throw new Error("prepayment date is after the payoff date");
   const boundaryRow = baseRows[boundaryIndex]!;
@@ -224,10 +227,11 @@ function addPrepaymentToRows(
     const activeRatePeriod = activeRateForPayment(component.ratePeriods, allPaymentDates, Math.max(0, absolutePaymentIndex), component.firstPaymentDate);
     const currentMonthlyRate = rate(activeRatePeriod.annualRate).div(TWELVE);
     if (activeRatePeriod.effectiveDate !== previousRate) {
-      if (previousRate !== "") segmentIndex += 1;
-      previousRate = activeRatePeriod.effectiveDate;
+      const isFirstRegeneratedSegment = previousRate === "";
+      if (!isFirstRegeneratedSegment) segmentIndex += 1;
       remainingSegmentPeriods = Math.max(1, targetPeriods - index);
-      const keepPrepaymentPayment = previousRate === "" && activeRatePeriod.annualRate === boundaryRow.annualRate && event.strategy === "reduce_term" && component.repaymentMethod === "equal_payment";
+      const keepPrepaymentPayment = isFirstRegeneratedSegment && activeRatePeriod.annualRate === boundaryRow.annualRate && event.strategy === "reduce_term" && component.repaymentMethod === "equal_payment";
+      previousRate = activeRatePeriod.effectiveDate;
       segmentPayment = keepPrepaymentPayment
         ? payment
         : monthlyPayment(balance, currentMonthlyRate, remainingSegmentPeriods);
@@ -326,10 +330,18 @@ export function comparePrepayment(
   );
   const beforePayment = new Decimal(before.metrics.nextPayment);
   const afterPayment = new Decimal(after.metrics.nextPayment);
+  const prepaymentInterest = money(event.allocations.reduce(
+    (sum, allocation) => sum.plus(money(allocation.interestAmount ?? "0")),
+    ZERO
+  ));
+  const totalInterestSaved = money(new Decimal(before.metrics.totalInterest).minus(after.metrics.totalInterest));
   return {
     before,
     after,
     savedInterest: money(new Decimal(before.metrics.remainingInterest).minus(after.metrics.remainingInterest)).toFixed(2),
+    totalInterestSaved: totalInterestSaved.toFixed(2),
+    prepaymentInterest: prepaymentInterest.toFixed(2),
+    netSavedInterest: money(totalInterestSaved.minus(prepaymentInterest)).toFixed(2),
     savedPeriods: before.metrics.remainingPeriods - after.metrics.remainingPeriods,
     firstPaymentReduction: money(beforePayment.minus(afterPayment)).toFixed(2),
     prepaymentDate: event.date,

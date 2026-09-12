@@ -29,7 +29,8 @@ export const prepaymentInputSchema = z.object({
   strategy: z.enum(["reduce_term", "reduce_payment"]),
   components: z.array(z.object({
     componentId: z.string().min(1),
-    amount: decimalStringSchema
+    amount: decimalStringSchema,
+    interestAmount: decimalStringSchema.optional().default("0.00")
   })).min(1)
 });
 

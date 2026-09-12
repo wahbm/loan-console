@@ -34,7 +34,7 @@ export type BackupData = {
   loanComponents: LoanComponent[];
   ratePeriods: RatePeriod[];
   prepaymentScenarios: SavedScenario[];
-  prepaymentAllocations: Array<{ id: string; scenarioId: string; componentId: string; amount: string }>;
+  prepaymentAllocations: Array<{ id: string; scenarioId: string; componentId: string; amount: string; interestAmount?: string }>;
 };
 
 export interface Repository {
