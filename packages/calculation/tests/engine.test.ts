@@ -41,6 +41,17 @@ describe("date anchors", () => {
 });
 
 describe("loan schedule engine", () => {
+  it("shows the reduced payment after the boundary while the upcoming installment stays unchanged", () => {
+    const result = comparePrepayment([commercialMortgageComponent], "2026-09-14", {
+      date: "2026-09-14", strategy: "reduce_payment",
+      allocations: [{ componentId: commercialMortgageComponent.id, amount: "500000.00" }]
+    });
+    expect(result.after.metrics.nextPayment).toBe(result.before.metrics.nextPayment);
+    expect(result.effectivePayments[0]?.boundaryDate).toBe("2026-09-20");
+    expect(result.effectivePayments[0]?.paymentDate).toBe("2026-10-20");
+    expect(Number(result.effectivePayments[0]?.afterPayment)).toBeLessThan(12517.01);
+    expect(result.effectivePayments[0]?.beforePayment).toBe("12517.01");
+  });
   it("generates equal payment rows and closes at zero", () => {
     const schedule = generateComponentSchedule(equalPaymentComponent, "2026-01-01");
     expect(schedule.rows).toHaveLength(12);

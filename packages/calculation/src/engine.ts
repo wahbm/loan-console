@@ -335,7 +335,29 @@ export function comparePrepayment(
     ZERO
   ));
   const totalInterestSaved = money(new Decimal(before.metrics.totalInterest).minus(after.metrics.totalInterest));
+  // Compare the same installment immediately after each component's boundary,
+  // independently of the dashboard's asOf-based next payment.
+  const effectivePayments = before.components.flatMap((component) => {
+    const allocation = event.allocations.find((item) => item.componentId === component.componentId);
+    if (!allocation || money(allocation.amount).eq(0)) return [];
+    const boundaryIndex = component.rows.findIndex((row) => row.paymentDate >= event.date);
+    const boundary = component.rows[boundaryIndex]!;
+    const originalNext = component.rows[boundaryIndex + 1];
+    const changedNext = after.components.find((item) => item.componentId === component.componentId)
+      ?.rows.find((row) => row.paymentDate === originalNext?.paymentDate);
+    const beforePayment = originalNext?.payment ?? "0.00";
+    const afterPayment = changedNext?.payment ?? "0.00";
+    return [{
+      componentId: component.componentId,
+      boundaryDate: boundary.paymentDate,
+      paymentDate: changedNext?.paymentDate ?? null,
+      beforePayment,
+      afterPayment,
+      reduction: money(new Decimal(beforePayment).minus(afterPayment)).toFixed(2)
+    }];
+  });
   return {
+    effectivePayments,
     before,
     after,
     savedInterest: money(new Decimal(before.metrics.remainingInterest).minus(after.metrics.remainingInterest)).toFixed(2),

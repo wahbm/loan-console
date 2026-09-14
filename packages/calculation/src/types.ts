@@ -70,6 +70,14 @@ export type LoanSchedule = {
 };
 
 export type PrepaymentComparison = {
+  effectivePayments?: Array<{
+    componentId: string;
+    boundaryDate: string;
+    paymentDate: string | null;
+    beforePayment: string;
+    afterPayment: string;
+    reduction: string;
+  }>;
   before: LoanSchedule;
   after: LoanSchedule;
   savedInterest: string;
